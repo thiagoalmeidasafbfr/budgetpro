@@ -7,7 +7,14 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "budgetpro-secret-key-change-in-production-2026"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://10.1.100.174:3000",
+        "http://10.1.100.174:3001",
+        "http://10.1.100.174:3002",
+    ]
 
     model_config = {
         "env_file": ".env",
