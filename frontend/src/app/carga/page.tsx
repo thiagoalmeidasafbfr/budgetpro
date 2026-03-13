@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Upload, CheckCircle, AlertCircle, Loader2, Database, FileSpreadsheet } from "lucide-react";
 
-const API_BASE = "/backend";
+const API_BASE = "http://localhost:8000";
 
 type TipoImportacao = "centros-de-custo" | "plano-de-contas" | "lancamentos";
 
