@@ -10,6 +10,7 @@ from app.routers import (
 )
 from app.routers import import_router
 from app.routers import importacao_router
+from app.routers import lancamentos_router
 
 app = FastAPI(
     title="BudgetPro API",
@@ -25,7 +26,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all routers
 app.include_router(auth_router.router)
 app.include_router(companies_router.router)
 app.include_router(departments_router.router)
@@ -40,6 +40,7 @@ app.include_router(audit_router.router)
 app.include_router(users_router.router)
 app.include_router(import_router.router)
 app.include_router(importacao_router.router)
+app.include_router(lancamentos_router.router)
 
 
 @app.on_event("startup")
