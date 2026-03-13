@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Upload, CheckCircle, AlertCircle, Loader2, Database, FileSpreadsheet } from "lucide-react";
 
+const API_BASE = "/backend";
+
 type TipoImportacao = "centros-de-custo" | "plano-de-contas" | "lancamentos";
 
 interface StatusCarga {
@@ -57,7 +59,7 @@ export default function CargaDados() {
   const carregarStatus = async () => {
     setLoadingStatus(true);
     try {
-      const res = await fetch("/api/importacao/status");
+      const res = await fetch(`${API_BASE}/api/importacao/status`);
       if (res.ok) setStatus(await res.json());
     } catch {
       // backend pode estar offline
@@ -76,7 +78,7 @@ export default function CargaDados() {
     formData.append("file", file);
 
     try {
-      const res = await fetch(`/api/importacao/${tipo}`, {
+      const res = await fetch(`${API_BASE}/api/importacao/${tipo}`, {
         method: "POST",
         body: formData,
       });
@@ -98,7 +100,6 @@ export default function CargaDados() {
         <p className="text-gray-500 mt-1">Importe suas planilhas do Excel (salvas como CSV) para o sistema</p>
       </div>
 
-      {/* Status do banco */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -138,7 +139,6 @@ export default function CargaDados() {
         )}
       </div>
 
-      {/* Seleção do tipo */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <p className="text-sm font-medium text-gray-700 mb-3">1. Selecione o tipo de importação</p>
         <div className="flex flex-col gap-2">
@@ -167,7 +167,6 @@ export default function CargaDados() {
         </div>
       </div>
 
-      {/* Upload do arquivo */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <p className="text-sm font-medium text-gray-700 mb-3">2. Selecione o arquivo CSV</p>
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
@@ -194,7 +193,6 @@ export default function CargaDados() {
         </div>
       </div>
 
-      {/* Botão importar */}
       <button
         onClick={handleImportar}
         disabled={!file || loading}
@@ -207,7 +205,6 @@ export default function CargaDados() {
         )}
       </button>
 
-      {/* Resultado */}
       {resultado && (
         <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -238,7 +235,6 @@ export default function CargaDados() {
         </div>
       )}
 
-      {/* Instrução de como salvar como CSV */}
       <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
         <p className="text-sm font-semibold text-amber-800 mb-2">📋 Como exportar do Excel para CSV</p>
         <ol className="text-sm text-amber-700 space-y-1 list-decimal list-inside">
