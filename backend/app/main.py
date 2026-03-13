@@ -9,6 +9,7 @@ from app.routers import (
     dashboard_router, audit_router, users_router,
 )
 from app.routers import import_router
+from app.routers import importacao_router
 
 app = FastAPI(
     title="BudgetPro API",
@@ -38,6 +39,7 @@ app.include_router(dashboard_router.router)
 app.include_router(audit_router.router)
 app.include_router(users_router.router)
 app.include_router(import_router.router)
+app.include_router(importacao_router.router)
 
 
 @app.on_event("startup")
