@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Column, String, Boolean, Integer, Numeric, Date, Text, JSON,
-    ForeignKey, DateTime, Enum, UniqueConstraint, Index, event, TypeDecorator
+    ForeignKey, DateTime, Enum, UniqueConstraint, Index, TypeDecorator
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -43,6 +43,8 @@ class AuditAction(str, enum.Enum):
     create = "create"
     update = "update"
     delete = "delete"
+    approve = "approve"
+    lock = "lock"
 
 
 class AccountCategory(str, enum.Enum):
@@ -72,8 +74,14 @@ class ForecastMethod(str, enum.Enum):
     manual = "manual"
 
 
+class ApprovalStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
 # ===========================================================================
-# MODELOS ORIGINAIS (compatibilidade com routers existentes)
+# MODELOS ORIGINAIS
 # ===========================================================================
 
 class Company(Base):
@@ -154,6 +162,7 @@ class BudgetVersion(Base):
 
     budgets = relationship("Budget", back_populates="version")
     forecasts = relationship("Forecast", back_populates="version")
+    approvals = relationship("ApprovalWorkflow", back_populates="version")
 
 
 class Budget(Base):
@@ -250,12 +259,26 @@ class Forecast(Base):
         ])
 
 
+class ApprovalWorkflow(Base):
+    __tablename__ = "approval_workflows"
+
+    id = Column(UUIDType, primary_key=True, default=gen_uuid)
+    version_id = Column(UUIDType, ForeignKey("budget_versions.id"), nullable=False)
+    status = Column(Enum(ApprovalStatus), nullable=False, default=ApprovalStatus.pending)
+    requested_by = Column(UUIDType, ForeignKey("users.id"), nullable=False)
+    approver_id = Column(UUIDType, ForeignKey("users.id"), nullable=True)
+    requested_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+    comments = Column(Text, nullable=True)
+
+    version = relationship("BudgetVersion", back_populates="approvals")
+
+
 # ===========================================================================
 # MODELOS NOVOS — Hierarquia real do cliente
 # ===========================================================================
 
 class Area(Base):
-    """Nível 1 da hierarquia de centros de custo (ex: B.2 - Backoffice)"""
     __tablename__ = "areas"
 
     id = Column(UUIDType, primary_key=True, default=gen_uuid)
@@ -267,7 +290,6 @@ class Area(Base):
 
 
 class Departamento(Base):
-    """Nível 2 da hierarquia de centros de custo (ex: B.202 - Finanças)"""
     __tablename__ = "departamentos"
 
     id = Column(UUIDType, primary_key=True, default=gen_uuid)
@@ -281,7 +303,6 @@ class Departamento(Base):
 
 
 class CentroDeCusto(Base):
-    """Nível 3 (analítico) da hierarquia de centros de custo (ex: B.202001 - Tesouraria)"""
     __tablename__ = "centros_de_custo"
 
     id = Column(UUIDType, primary_key=True, default=gen_uuid)
@@ -295,7 +316,6 @@ class CentroDeCusto(Base):
 
 
 class ContaContabil(Base):
-    """Plano de contas com hierarquia de 5 níveis (ex: 3.1.01.001.001 - TV ABERTA)"""
     __tablename__ = "contas_contabeis"
 
     id = Column(UUIDType, primary_key=True, default=gen_uuid)
@@ -315,10 +335,6 @@ class ContaContabil(Base):
 
 
 class Lancamento(Base):
-    """
-    Tabela fato unificada para Budget e Realizado/Razão.
-    A coluna 'fonte' diferencia os registros: 'Budget' ou 'Razão'.
-    """
     __tablename__ = "lancamentos"
 
     id = Column(UUIDType, primary_key=True, default=gen_uuid)
