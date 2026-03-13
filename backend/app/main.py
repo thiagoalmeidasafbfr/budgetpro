@@ -8,11 +8,12 @@ from app.routers import (
     budgets_router, actuals_router, forecast_router,
     dashboard_router, audit_router, users_router,
 )
+from app.routers import importacao_router
 
 app = FastAPI(
     title="BudgetPro API",
     description="Plataforma de Controle Orçamentário Corporativo",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -23,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all routers
+# Routers existentes
 app.include_router(auth_router.router)
 app.include_router(companies_router.router)
 app.include_router(departments_router.router)
@@ -37,6 +38,9 @@ app.include_router(dashboard_router.router)
 app.include_router(audit_router.router)
 app.include_router(users_router.router)
 
+# Novas rotas de importação
+app.include_router(importacao_router.router)
+
 
 @app.on_event("startup")
 def on_startup():
@@ -45,4 +49,4 @@ def on_startup():
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"status": "healthy", "version": "2.0.0"}
