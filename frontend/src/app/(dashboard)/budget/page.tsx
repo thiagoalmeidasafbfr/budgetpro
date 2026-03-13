@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback, Fragment } from "react";
-import { Upload, Download, Plus, Search, MessageSquare, Filter } from "lucide-react";
+import { useState, useMemo, useCallback, Fragment, useRef } from "react";
+import { Upload, Download, Plus, Search, MessageSquare, Filter, X, Check } from "lucide-react";
 import { formatCurrency, cn, MONTHS, MONTH_KEYS } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,7 @@ interface BudgetRow {
   contaContabil: string;
   categoria: Categoria;
   valores: number[]; // 12 months
+  comment?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +224,191 @@ function rowTotal(valores: number[]): number {
   return valores.reduce((sum, v) => sum + v, 0);
 }
 
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+// ---------------------------------------------------------------------------
+// Modal — Adicionar Linha
+// ---------------------------------------------------------------------------
+
+interface AddRowModalProps {
+  onClose: () => void;
+  onAdd: (row: BudgetRow) => void;
+}
+
+function AddRowModal({ onClose, onAdd }: AddRowModalProps) {
+  const [centroCusto, setCentroCusto] = useState(CENTROS_CUSTO[1]);
+  const [contaContabil, setContaContabil] = useState("");
+  const [categoria, setCategoria] = useState<Categoria>("Despesa");
+  const [valores, setValores] = useState<string[]>(new Array(12).fill("0"));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contaContabil.trim()) return;
+    const code = centroCusto.split(" ")[0];
+    onAdd({
+      id: generateId(),
+      centroCusto,
+      centroCustoCode: code,
+      contaContabil: contaContabil.trim(),
+      categoria,
+      valores: valores.map((v) => parseFloat(v) || 0),
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-2xl rounded-xl bg-card border border-border shadow-xl p-6 mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-semibold">Adicionar Nova Linha</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Centro de Custo */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Centro de Custo</label>
+              <select
+                value={centroCusto}
+                onChange={(e) => setCentroCusto(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {CENTROS_CUSTO.filter((c) => c !== "Todos").map((cc) => (
+                  <option key={cc} value={cc}>{cc}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Categoria</label>
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value as Categoria)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {(["Receita", "Custo", "Despesa", "Investimento"] as Categoria[]).map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Conta Contábil */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Conta Contábil</label>
+            <input
+              type="text"
+              value={contaContabil}
+              onChange={(e) => setContaContabil(e.target.value)}
+              placeholder="Ex: 5.1.10 Manutenção"
+              required
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          {/* Valores mensais */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Valores Mensais (R$)</label>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {MONTHS.map((month, i) => (
+                <div key={month} className="space-y-0.5">
+                  <label className="text-xs text-muted-foreground">{month}</label>
+                  <input
+                    type="number"
+                    value={valores[i]}
+                    onChange={(e) => {
+                      const next = [...valores];
+                      next[i] = e.target.value;
+                      setValores(next);
+                    }}
+                    min="0"
+                    step="0.01"
+                    className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-input bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Adicionar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Modal — Comentário
+// ---------------------------------------------------------------------------
+
+interface CommentModalProps {
+  rowId: string;
+  contaContabil: string;
+  initialComment: string;
+  onClose: () => void;
+  onSave: (rowId: string, comment: string) => void;
+}
+
+function CommentModal({ rowId, contaContabil, initialComment, onClose, onSave }: CommentModalProps) {
+  const [text, setText] = useState(initialComment);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-xl bg-card border border-border shadow-xl p-6 mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold">Comentário</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3 truncate">{contaContabil}</p>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={4}
+          placeholder="Adicione uma observação para esta linha..."
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          autoFocus
+        />
+        <div className="flex justify-end gap-3 mt-4">
+          <button
+            onClick={onClose}
+            className="rounded-md border border-input bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => { onSave(rowId, text); onClose(); }}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Check className="h-4 w-4" />
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -235,6 +421,10 @@ export default function BudgetPage() {
   const [filterCategoria, setFilterCategoria] = useState<"Todas" | Categoria>("Todas");
   const [searchText, setSearchText] = useState("");
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [commentModal, setCommentModal] = useState<{ rowId: string; contaContabil: string; comment: string } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filtered data
   const filteredData = useMemo(() => {
@@ -325,6 +515,110 @@ export default function BudgetPage() {
     [commitEdit]
   );
 
+  // --- Adicionar linha ---
+  const handleAddRow = useCallback((row: BudgetRow) => {
+    setData((prev) => [...prev, row]);
+  }, []);
+
+  // --- Comentário ---
+  const handleSaveComment = useCallback((rowId: string, comment: string) => {
+    setData((prev) =>
+      prev.map((r) => (r.id === rowId ? { ...r, comment } : r))
+    );
+  }, []);
+
+  // --- Exportar CSV ---
+  const handleExport = useCallback(() => {
+    const headers = ["Centro de Custo", "Conta Contábil", "Categoria", ...MONTHS, "Total", "Comentário"];
+    const rows = data.map((row) => [
+      row.centroCusto,
+      row.contaContabil,
+      row.categoria,
+      ...row.valores.map((v) => v.toString()),
+      rowTotal(row.valores).toString(),
+      row.comment || "",
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((r) => r.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `orcamento_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [data]);
+
+  // --- Importar CSV ---
+  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = (event.target?.result as string).replace(/^\uFEFF/, "");
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        if (lines.length < 2) throw new Error("Arquivo vazio ou sem dados.");
+
+        // skip header line
+        const dataLines = lines.slice(1);
+        const newRows: BudgetRow[] = [];
+
+        for (const line of dataLines) {
+          // Parse CSV respecting quoted fields
+          const cells: string[] = [];
+          let current = "";
+          let inQuote = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') {
+              if (inQuote && line[i + 1] === '"') { current += '"'; i++; }
+              else { inQuote = !inQuote; }
+            } else if (ch === "," && !inQuote) {
+              cells.push(current); current = "";
+            } else {
+              current += ch;
+            }
+          }
+          cells.push(current);
+
+          if (cells.length < 16) continue; // skip malformed
+
+          const cc = cells[0]?.trim();
+          const conta = cells[1]?.trim();
+          const cat = cells[2]?.trim() as Categoria;
+          const vals = cells.slice(3, 15).map((v) => parseFloat(v.trim()) || 0);
+          const comment = cells[16]?.trim() || undefined;
+
+          if (!cc || !conta || !cat) continue;
+
+          newRows.push({
+            id: generateId(),
+            centroCusto: cc,
+            centroCustoCode: cc.split(" ")[0],
+            contaContabil: conta,
+            categoria: cat,
+            valores: vals.length === 12 ? vals : [...vals, ...new Array(12 - vals.length).fill(0)],
+            comment,
+          });
+        }
+
+        if (newRows.length === 0) throw new Error("Nenhuma linha válida encontrada no arquivo.");
+        setData((prev) => [...prev, ...newRows]);
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : "Erro ao importar arquivo.");
+      }
+    };
+    reader.readAsText(file, "utf-8");
+    // reset input so same file can be re-imported
+    e.target.value = "";
+  }, []);
+
   // Sticky column widths
   const stickyCol1 = "left-0 w-[180px] min-w-[180px]";
   const stickyCol2 = "left-[180px] w-[240px] min-w-[240px]";
@@ -332,6 +626,29 @@ export default function BudgetPage() {
 
   return (
     <div className="flex flex-col gap-4 h-full">
+      {/* Modals */}
+      {showAddModal && (
+        <AddRowModal onClose={() => setShowAddModal(false)} onAdd={handleAddRow} />
+      )}
+      {commentModal && (
+        <CommentModal
+          rowId={commentModal.rowId}
+          contaContabil={commentModal.contaContabil}
+          initialComment={commentModal.comment}
+          onClose={() => setCommentModal(null)}
+          onSave={handleSaveComment}
+        />
+      )}
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        className="hidden"
+        onChange={handleImport}
+      />
+
       {/* ---------------------------------------------------------------- */}
       {/* Header                                                           */}
       {/* ---------------------------------------------------------------- */}
@@ -339,6 +656,13 @@ export default function BudgetPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Planejamento Orçamentário</h1>
         </div>
+
+        {importError && (
+          <div className="flex items-center justify-between rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-2 text-sm text-destructive">
+            <span>{importError}</span>
+            <button onClick={() => setImportError(null)}><X className="h-4 w-4" /></button>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 flex-wrap">
           {/* Version selector */}
@@ -359,15 +683,24 @@ export default function BudgetPage() {
           <div className="flex-1" />
 
           {/* Action buttons */}
-          <button className="inline-flex items-center gap-2 rounded-md border border-input bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted transition-colors">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-2 rounded-md border border-input bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted transition-colors"
+          >
             <Upload className="h-4 w-4" />
             Importar Excel
           </button>
-          <button className="inline-flex items-center gap-2 rounded-md border border-input bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted transition-colors">
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 rounded-md border border-input bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-muted transition-colors"
+          >
             <Download className="h-4 w-4" />
             Exportar Excel
           </button>
-          <button className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+          >
             <Plus className="h-4 w-4" />
             Adicionar Linha
           </button>
@@ -474,6 +807,7 @@ export default function BudgetPage() {
                   {rows.map((row, rowIdx) => {
                     const total = rowTotal(row.valores);
                     const isHovered = hoveredRow === row.id;
+                    const hasComment = !!row.comment;
 
                     return (
                       <tr
@@ -569,12 +903,29 @@ export default function BudgetPage() {
 
                         {/* Comment icon */}
                         <td className="px-2 py-2 text-center">
-                          <MessageSquare
-                            className={cn(
-                              "h-4 w-4 text-muted-foreground/40 transition-opacity mx-auto",
-                              isHovered ? "opacity-100" : "opacity-0"
-                            )}
-                          />
+                          <button
+                            title={hasComment ? row.comment : "Adicionar comentário"}
+                            onClick={() =>
+                              setCommentModal({
+                                rowId: row.id,
+                                contaContabil: row.contaContabil,
+                                comment: row.comment || "",
+                              })
+                            }
+                            className="mx-auto flex items-center justify-center"
+                          >
+                            <MessageSquare
+                              className={cn(
+                                "h-4 w-4 transition-all",
+                                hasComment
+                                  ? "text-primary opacity-100"
+                                  : cn(
+                                      "text-muted-foreground/40",
+                                      isHovered ? "opacity-100" : "opacity-0"
+                                    )
+                              )}
+                            />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -666,4 +1017,3 @@ export default function BudgetPage() {
     </div>
   );
 }
-
